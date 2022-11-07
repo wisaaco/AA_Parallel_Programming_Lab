@@ -5,16 +5,6 @@
 
 int max(int num1, int num2);
 
-
-int main(){
-    oneapi::tbb::parallel_invoke(
-        [](){std::cout << "Hello " << std::endl;},
-        [](){std::cout << "TBB " << std::endl;},
-        [](){std::cout << max(10039,128903) << std::endl;}
-    );
-    return 0;
-}
-
 int max(int num1, int num2) {
    int result;
  
@@ -25,3 +15,14 @@ int max(int num1, int num2) {
  
    return result; 
 }
+
+
+int main(){
+    oneapi::tbb::parallel_invoke(
+        [](){std::cout << "Hello " << std::endl;},
+        [](){std::cout << "TBB " << std::endl;},
+        [](){std::cout << max(10039,128903) << std::endl;}
+    );
+    return 0;
+}
+
