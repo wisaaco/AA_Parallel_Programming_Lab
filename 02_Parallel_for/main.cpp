@@ -14,13 +14,13 @@ int main() {
 
     auto values = std::vector<double>(10000);
 
-    oneapi::tbb::parallel_for( open::tbb::blocked_range<int>(0,values.size()),
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<int>(0,values.size()),
         [](tbb::blocked_range<int> r)
-        or (int i=r.begin(); i<r.end(); ++i)
-        {
+    {
+        for (int i=r.begin(); i<r.end(); i++){
             values[i] = std::sin(i * 0.001);
         }
-
+    }
     double total = 0;
     for (double value : values){
         total += value;
