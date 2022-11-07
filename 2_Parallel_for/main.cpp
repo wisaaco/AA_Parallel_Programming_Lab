@@ -5,7 +5,7 @@
 #include <cmath>
 #include <vector>
 
-// https://docs.oneapi.io/versions/latest/onetbb/tbb_userguide/Migration_Guide/Task_Scheduler_Init.html
+// using namespace oneapi;
 
 int main() {
     // Get the default number of threads
