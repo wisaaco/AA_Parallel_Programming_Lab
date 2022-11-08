@@ -15,17 +15,15 @@ double DotProduct(float x[],  float y[], int n)
    auto total = tbb::parallel_reduce(
         tbb::blocked_range<int>(0, n),
         0.0,
-        // lambda function
         [&](tbb::blocked_range<int> r, double total_acc){
             for (int i = r.begin();i<r.end();++i){
                 total_acc += x[i]*y[i];
             }
             return total_acc;
-        }
-
-    , plus<double>());
+        },
+        plus<double>()
+    );
     return total;
-
 }
 
 int main(){
