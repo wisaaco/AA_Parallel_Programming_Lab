@@ -26,7 +26,6 @@ void ParallelSaxpy(float a, float x[],  float y[], float z[], int n)
 
 int main(){
 
-
 	int size = 1000;
     static vector<float> x(size);
     static vector<float> y(size);
