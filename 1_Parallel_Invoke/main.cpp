@@ -18,8 +18,9 @@ int max(int num1, int num2) {
 
 
 int main(){
-   // https://www.intel.com/content/www/us/en/develop/documentation/advisor-user-guide/top/model-threading-designs/add-parallelism-to-your-program/replace-annotations-with-tbb-code/parallelize-functions-tbb-tasks.html
+    // https://www.intel.com/content/www/us/en/develop/documentation/advisor-user-guide/top/model-threading-designs/add-parallelism-to-your-program/replace-annotations-with-tbb-code/parallelize-functions-tbb-tasks.html
     
+    //https://en.cppreference.com/w/cpp/language/lambda
     oneapi::tbb::parallel_invoke(
         [](){std::cout << "Hello " << std::endl;},
         [](){std::cout << "TBB " << std::endl;},
