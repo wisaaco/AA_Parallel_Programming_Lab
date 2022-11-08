@@ -22,6 +22,7 @@ int main(){
         [](){std::cout << "Hello " << std::endl;},
         [](){std::cout << "TBB " << std::endl;},
         [](){std::cout << max(10039,128903) << std::endl;}
+        [&]{std::cout << "Otra tipo de llamada " <<std::endl;}
     );
     return 0;
 }
