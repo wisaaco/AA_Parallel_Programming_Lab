@@ -3,8 +3,10 @@ import random
 
 def run_saxpy(x,y,a):
 	out = []
+	# out = [0]*len(x)
 	for i in range(len(x)):
 		out.append((x[i]+y[i])*a)
+		# out[i] = (x[i]+y[i])*a
 	return out
 
 if __name__ == "__main__":
