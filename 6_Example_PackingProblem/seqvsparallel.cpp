@@ -12,94 +12,127 @@ using namespace std;
 using namespace oneapi;
 using namespace tbb;
 
-template <class T>
+/**
+ * This allows selecting between two different versions of the inner
+ * loop function in the parallel scan implementation. This optimised
+ * version is more verbose, but avoids evaluating the same condition
+ * each and every loop iteration.
+ *
+ * When not using compiler optimisations, the unoptimised version is
+ * much worse (about +33% exec time for ARRAY_SIZE = 100000000). But
+ * with \c -O3 optimisations both approaches perform about the same,
+ * i.e. the compiler is smart enough to optimise this if allowed to.
+ *
+ * This shows that manual optimisations (which often make the source
+ * code harder to read and maintain) may be useless when things like
+ * the compiler can automatically perform the same optimisations. So
+ * consider profiling / benchmarking before wasting time optimising.
+ */
+#define USE_OPTIMISED_LOOP 0
+
+template<typename T>
 class Body
 {
-    T reduced_result;
-    T* const y;
-    const T* const x;
+	T sum;
+	T* const y;
+	const T* const x;
 
-    public:
+public:
+	Body(T y_[], const T x_[]) : sum(0), x(x_), y(y_) {}
 
-    Body( T y_[], const T x_[] ) : reduced_result(0), x(x_), y(y_) {}
+	T get_sum() const { return sum; }
 
-    T get_reduced_result() const {return reduced_result;}
+	template<typename Tag>
+	void operator()(const blocked_range<size_t>& r, Tag)
+	{
+#if USE_OPTIMISED_LOOP
+		/**
+		 * Evaluate \c Tag::is_final_scan() once outside the
+		 * loop, but we need to have two separate loops.
+		 */
+		if (Tag::is_final_scan()) {
+			for (size_t i = r.begin(); i < r.end(); ++i) {
+				sum = sum + x[i];
+				y[i] = sum;
+			}
+		} else {
+			for (size_t i = r.begin(); i < r.end(); ++i) {
+				sum = sum + x[i];
+			}
+		}
+#else
+		/**
+		 * Less verbose, but \c Tag::is_final_scan() is
+		 * evaluated each and every iteration. Or is it?
+		 */
+		for (size_t i = r.begin(); i < r.end(); ++i) {
+			sum = sum + x[i];
+			if (Tag::is_final_scan()) {
+				y[i] = sum;
+			}
+		}
+#endif
+	}
 
-    template<typename Tag>
-    void operator()( const blocked_range<int>& r, Tag )
-    {
-        T temp = reduced_result;
+	Body(Body& b, split) : x(b.x), y(b.y), sum(0) {}
 
-        for( int i=r.begin(); i<r.end(); ++i )
-        {
-            temp = temp+x[i];
-            if( Tag::is_final_scan() )
-            y[i] = temp;
-        }
+	void reverse_join(Body& a)
+	{
+		sum = a.sum + sum;
+	}
 
-        reduced_result = temp;
-    }
-
-    Body( Body& b, split ) : x(b.x), y(b.y), reduced_result(10) {}
-
-    void reverse_join( Body& a )
-    {
-        reduced_result = a.reduced_result + reduced_result;
-    }
-
-    void assign( Body& b )
-    {
-        reduced_result = b.reduced_result;
-    }
+	void assign(Body& b)
+	{
+		sum = b.sum;
+	}
 };
 
-
-template<class T>
-float DoParallelScan( T y[], const T x[], int n)
+template<typename T>
+T DoParallelScan(T y[], const T x[], size_t n)
 {
-    Body<int> body(y,x);
-    tick_count t1,t2,t3,t4;
-    t1=tick_count::now();
-    parallel_scan( blocked_range<int>(0,n), body , auto_partitioner() );
-    t2=tick_count::now();
-    cout<<"Time Taken for parallel scan is \t"<<(t2-t1).seconds()<<endl;
-    return body.get_reduced_result();
+	Body<T> body(y, x);
+	const tick_count t0 = tick_count::now();
+	parallel_scan(blocked_range<size_t>(0, n), body);
+	const tick_count t1 = tick_count::now();
+	cout << "Time Taken for parallel scan is: " << (t1 - t0).seconds() << endl;
+	return body.get_sum();
 }
 
-
-template<class T1>
-float SerialScan(T1 y[], const T1 x[], int n)
+template<typename T>
+T DoSerialScan(T y[], const T x[], size_t n)
 {
-    tick_count t3,t4;
-
-    t3=tick_count::now();
-    T1 temp = 10;
-
-    for( int i=1; i<n; ++i )
-    {
-        temp = temp+x[i];
-        y[i] = temp;
-    }
-    t4=tick_count::now();
-    cout<<"Time Taken for serial  scan is \t"<<(t4-t3).seconds()<<endl;
-    return temp;
-
+	const tick_count t0 = tick_count::now();
+	T temp = 0;
+	for (size_t i = 0; i < n; ++i) {
+		temp = temp + x[i];
+		y[i] = temp;
+	}
+	const tick_count t1 = tick_count::now();
+	cout << "Time Taken for   serial scan is: " << (t1 - t0).seconds() << endl;
+	return temp;
 }
 
+/**
+ * The size of the input and output arrays used to perform the serial
+ * and parallel scan operations. If the arrays do not fit in RAM then
+ * performance will be awful and/or the program may get killed.
+ */
+static const size_t ARRAY_SIZE = 1000000;
 
 int main()
 {
+	/* For some reason, using very large C-style arrays causes segfaults in the loop */
+	std::vector<int> y1(ARRAY_SIZE), x1(ARRAY_SIZE);
 
-    int y1[100000],x1[100000];
+	for (size_t i = 0; i < ARRAY_SIZE; i++) {
+		x1[i] = static_cast<int>(i & 0x7fffffff);
+	}
 
-    for(int i=0;i<100000;i++)
-        x1[i]=i;
+	const int outSerial = DoSerialScan(y1.data(), x1.data(), ARRAY_SIZE);
+	const int outParallel = DoParallelScan(y1.data(), x1.data(), ARRAY_SIZE);
 
-    cout<<fixed;
+	cout << "  serial scan output is \t" << outSerial << endl;
+	cout << "parallel scan output is \t" << outParallel << endl;
 
-    cout<<"\n serial scan output is \t"<<SerialScan(y1,x1,100000)<<endl;
-
-    cout<<"\n parallel scan output is \t"<<DoParallelScan(y1,x1,100000)<<endl;
-
-    return 0;
+	return 0;
 }
